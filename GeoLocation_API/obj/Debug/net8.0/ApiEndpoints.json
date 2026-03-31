@@ -1,0 +1,39 @@
+[
+  {
+    "ContainingType": "GeoLocation_API.Controllers.GeoLocationControllerr",
+    "Method": "PostUser_LocationDetails",
+    "RelativePath": "Update_UserLocation",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "user_Location",
+        "Type": "GeoLocation_API.ResponseModel.User_LocationDetails",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "GeoLocation_API.Controllers.WeatherForecastController",
+    "Method": "Get",
+    "RelativePath": "WeatherForecast",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": [
+      {
+        "Type": "System.Collections.Generic.IEnumerable\u00601[[GeoLocation_API.WeatherForecast, GeoLocation_API, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ],
+    "EndpointName": "GetWeatherForecast"
+  }
+]
