@@ -11,6 +11,7 @@ using System.Data;
 using System.Globalization;
 using System.Net.Http;
 using System.Text.Json;
+using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace GeoLocation_API.Repository.RepositoryServices
 {
@@ -37,18 +38,13 @@ namespace GeoLocation_API.Repository.RepositoryServices
             _api_key = _configuration["api_key"];
             _httpClient = httpClient;
         }
-
         public async Task<ResponseObject> GetUserLocation(decimal? sessionUserId, decimal? businessGroupId , string? startDate,string? endDate)
         {
 
             DateTime? start = ParseDate(startDate);
+            string? strStart = start?.ToString("dd/MM/yyyy" , CultureInfo.InvariantCulture);
             DateTime? end = ParseDate(endDate);
-
-            // ✅ Night shift handling
-            if (start.HasValue && end.HasValue && start > end)
-            {
-                end = end.Value.AddDays(1);
-            }
+            string? strEnd = end?.ToString("dd/MM/yyyy" , CultureInfo.InvariantCulture);
             var response = new ResponseObject();
             using (var connection = _dapperDbConnection.CreateConnection())
             {
@@ -60,8 +56,8 @@ namespace GeoLocation_API.Repository.RepositoryServices
                     var parameters = new DynamicParameters();
                     parameters.Add("@Session_UserId", sessionUserId, DbType.Decimal);
                     parameters.Add("@Business_GroupId", businessGroupId, DbType.Decimal);
-                    parameters.Add("@StartDate", start, DbType.DateTime);
-                    parameters.Add("@EndDate", end, DbType.DateTime);
+                    parameters.Add("@StartDate", strStart, DbType.DateTime);
+                    parameters.Add("@EndDate", strEnd, DbType.DateTime);
 
                     var result = (await connection.QueryAsync<UserLocation_Model>(
                         "SP_GET_USER_LOCATION",
@@ -165,7 +161,6 @@ namespace GeoLocation_API.Repository.RepositoryServices
             }
              return response;
         }
-
         public async Task<string> GetAddressFromLatLong(double? latitude, double? longitude)
         {
             string key = _api_key;
@@ -193,7 +188,6 @@ namespace GeoLocation_API.Repository.RepositoryServices
                 return "No Address Found";
             }
         }
-
         public async Task<string> InsertUpdateUserLocation(UserLocation_Model model)
         {
             using (var connection = _dapperDbConnection.CreateConnection())
@@ -240,7 +234,6 @@ namespace GeoLocation_API.Repository.RepositoryServices
                 }
             }
         }
-
         public async Task<List<UserLocationExportModel>> GetUserLocationList(decimal? sessionUserId, decimal? businessGroupId)
         {
             using (var connection = _dapperDbConnection.CreateConnection())
@@ -317,7 +310,6 @@ namespace GeoLocation_API.Repository.RepositoryServices
             
         
         }
-
         //public async Task<AddressModel> GetStructuredAddressAsync(double? lat, double? lng)
         //{
         //    string url = $"https://nominatim.openstreetmap.org/reverse?lat={lat}&lon={lng}&format=json";
@@ -342,7 +334,6 @@ namespace GeoLocation_API.Repository.RepositoryServices
         //        State = addressProp.TryGetProperty("state", out var state) ? state.GetString() : ""
         //    };
         //}
-
         public async Task<AddressModel> GetStructuredAddressAsync(double? lat, double? lng)
         {
             if (lat == null || lng == null)

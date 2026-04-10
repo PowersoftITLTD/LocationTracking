@@ -23,8 +23,6 @@ namespace GeoLocation_API.Controllers
             _geolocation = geolocation;
         }
 
-
-
         //[HttpGet("Get-Geolocation")]
         //public IActionResult Geolocation([FromBody] User_LocationDetails user_Location)  // [FromBody] CommoninputResponse commoninput
         //{
@@ -66,9 +64,7 @@ namespace GeoLocation_API.Controllers
         //    }
         //}
 
-
-
-        [HttpPost("Update_UserLocation")]
+  [HttpPost("Update_UserLocation")]
         public async Task<IActionResult> PostUser_LocationDetails([FromBody] User_LocationDetails user_Location)
         {
             var responseObject = new ResponseObject();
