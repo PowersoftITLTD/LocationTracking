@@ -57,7 +57,7 @@ namespace GeoLocation_ConsoleApplication
                 {
                     //string body = BuildEmailBody("John Doe Test", user.CheckIn_time.ToString(), user.Selected_location ,user.CheckOut_time.ToString(),user.checkout_location);
                     string body = BuildEmailBody(user.RA1,request.startDate ,request.endDate, user.Employees);
-                    List<string> ccList = new List<string> {};  // user.RA1_Email   //,  "narendrakumar.soni@powersoft.in" 
+                    List<string> ccList = new List<string> {};  // user.RA1_Email   //,  "narendrakumar.soni@powersoft.in", "hitesh.ghadage@powersoft.in" 
                     List<string> bccList = new List<string> {};
                    // SendEmail(user.RA1_Email, $"HUb Connect Report For {request.startDate}", body, ccList, bccList, null);
                     SendEmail(user.RA1_Email, $"Hub Connect Report For {request.startDate}", body, ccList, bccList, null ,fromEmail ,email_pass ,email_host );
@@ -353,8 +353,13 @@ namespace GeoLocation_ConsoleApplication
             sb.Append("<div style='font-size:13px;line-height:1.75;color:#4a6680;margin-bottom:20px;border-left:3px solid #2a7ab8;padding:8px 0 8px 14px;background:#f0f7ff;border-radius:0 4px 4px 0;'>");
             sb.Append($@"<div style='margin-bottom:10px;font-size:13px;color:#1b4f7a;'> Dear <strong>{employeeName}</strong> </div>");
             //sb.Append($"Dear {employeeName} <br/>");
-            sb.Append($"Please find below your reportee(s) attendance report recorded via the Hub Connect application for the period from  <strong>{startDate}</strong> to <strong>{endDate}</strong>.<br/>");
-            sb.Append("This record reflects verified check-in and check-out data as captured by the Hub Connect App.");
+            //sb.Append($"Please find below T your reportee(s) attendance report recorded via the Hub Connect application for the period from  <strong>{startDate}</strong> to <strong>{endDate}</strong>.<br/>");
+            sb.Append($"Please find below the attendance details of your reportee(s) recorded via the Hub Connect application for <strong>{startDate}</strong>.<br/>");
+            //sb.Append("This record reflects verified check-in and check-out data as captured by the Hub Connect App.");
+            sb.Append("This record reflects the verified check-in and check-out location as captured by the Hub Connect App.<br/>");
+            //sb.Append("You are requested to verify that attendance was marked from the designated work location / official premises.<br/>");
+            //sb.Append("Kindly approve if correct, or reject with reasons for any discrepancy on the ERP.<br/>");
+            //sb.Append("Please note that the final attendance will be based on your approval, and no backend changes will be made by HR/Admin.");
             sb.Append("</div>");
 
             // ── ATTENDANCE TABLE — fully inline styled ──
@@ -418,12 +423,26 @@ namespace GeoLocation_ConsoleApplication
             // Footer note
             sb.Append("<p >");
             //sb.Append("<span style='background:#ddeaf7;border-top:1px solid #c2d8ed;padding:14px 28px;'>Confidential &middot; For Internal Use Only</span>");
-            sb.Append("<span style='font-size:11px;color:#7a9ab8;line-height:1.65;margin:0;'>Confidential &middot; For Internal Use Only</span>");
+            sb.Append("<span style='font-size:11px;color:#7a9ab8;line-height:1.65;margin:0;'>You are requested to verify that attendance was marked from the designated work location / official premises.Kindly approve if correct, or reject with reasons for any discrepancy on the ERP.Please note that the final attendance will be based on your approval, and no backend changes will be made by HR/Admin.</span>");
             sb.Append("</p>");
+            //sb.Append("<p >");
+            ////sb.Append("<span style='background:#ddeaf7;border-top:1px solid #c2d8ed;padding:14px 28px;'>Confidential &middot; For Internal Use Only</span>");
+            //sb.Append("<span style='font-size:11px;color:#7a9ab8;line-height:1.65;margin:0;'>Kindly approve if correct, or reject with reasons for any discrepancy on the ERP.</span>");
+            //sb.Append("</p>");
+            //sb.Append("<p >");
+            ////sb.Append("<span style='background:#ddeaf7;border-top:1px solid #c2d8ed;padding:14px 28px;'>Confidential &middot; For Internal Use Only</span>");
+            //sb.Append("<span style='font-size:11px;color:#7a9ab8;line-height:1.65;margin:0;'>Please note that the final attendance will be based on your approval, and no backend changes will be made by HR/Admin.</span>");
+            //sb.Append("</p>");
+
+
             sb.Append("<p >");
             //sb.Append("<span style='background:#ddeaf7;border-top:1px solid #c2d8ed;padding:14px 28px;'>Confidential &middot; For Internal Use Only</span>");
-            sb.Append("<span style='font-size:11px;color:#7a9ab8;line-height:1.65;margin:0;'>This is an automated notification. Please do not reply directly to this message. For discrepancies, contact your HR Team.</span>");
+            sb.Append("<span style='font-size:11px;color:#7a9ab8;line-height:1.65;margin:0;'>Confidential &middot; For Internal Use Only. <br/> This is an automated notification. Please do not reply directly to this message. For discrepancies, contact your HR Team.</span>");
             sb.Append("</p>");
+            //sb.Append("<p >");
+            ////sb.Append("<span style='background:#ddeaf7;border-top:1px solid #c2d8ed;padding:14px 28px;'>Confidential &middot; For Internal Use Only</span>");
+            //sb.Append("<span style='font-size:11px;color:#7a9ab8;line-height:1.65;margin:0;'>This is an automated notification. Please do not reply directly to this message. For discrepancies, contact your HR Team.</span>");
+            //sb.Append("</p>");
 
             sb.Append("</td>");
             sb.Append("</tr>");
