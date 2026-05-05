@@ -16,12 +16,14 @@ using System.Net.Http;
 using System.Net.Mail;
 using System.Runtime.InteropServices.ComTypes;
 using System.Text;
+using System.Text.Json;
 using System.Threading.Tasks;
 
 namespace GeoLocation_ConsoleApplication
 {
     public class Program
     {
+        static HttpClient _httpClient = new HttpClient();
         static async Task Main(string[] args)
         {
             try
@@ -31,10 +33,10 @@ namespace GeoLocation_ConsoleApplication
                 DateTime endDateDt = DateTime.UtcNow.Date;               // Today 00:00:00
 
                 string startDate = startDateDt.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture);
-                //string startDate = "06/04/2026"; //startDateDt.ToString("yyyy-MM-dd HH:mm:ss");
+                //string startDate = "26/03/2026"; //startDateDt.ToString("yyyy-MM-dd HH:mm:ss");
                 string endDate = endDateDt.ToString("dd/MM/yyyy",CultureInfo.InvariantCulture);
 
-                //string endDate = "06/04/2026";
+                //string endDate = "26/03/2026";
 
                 var request = new ApiRequest
                 {
@@ -45,13 +47,21 @@ namespace GeoLocation_ConsoleApplication
                     empCardNo= null
                 };
 
-                var result=  await GetRAWiseData(request.startDate ,request.endDate ,request.empCardNo);
-                // var userlocationlist=  await GetUserLocationList(sessionUserId, businessGroupId);
                 var emailconfig = new Email_InputResponse { MKEY = 0, MAIL_TYPE = null };
                 var Email_Para = await GetEmailConfigAsync(emailconfig.MKEY, emailconfig.MAIL_TYPE);
                 string fromEmail = Email_Para.FirstOrDefault()?.MAIL_FROM ?? null;
                 string email_pass = Email_Para.FirstOrDefault()?.SMTP_PASS ?? null;
                 string email_host = Email_Para.FirstOrDefault()?.SMTP_HOST ?? null;
+
+
+                var responseResult = await GetUserLocation(request.session_userId, request.businessGroupId, request.startDate, request.endDate);
+                if (responseResult.Status != "SUCCESS" || responseResult.Data == null)
+                {
+                    Console.WriteLine("Error: " + responseResult.Message);
+                    //return;
+                }
+
+                var result=  await GetRAWiseData(request.startDate ,request.endDate ,request.empCardNo);
 
                 foreach (var user in result)
                 {
@@ -973,34 +983,290 @@ namespace GeoLocation_ConsoleApplication
 
             return sb.ToString();
         }
+      
+        
+        //public static async Task<List<UserLocationExportModel>> GetUserLocationList(decimal? sessionUserId, decimal? businessGroupId)
+        //{
+        //    try
+        //    {
+        //        var _connection = ConfigurationManager.ConnectionStrings["defaultConnection"].ConnectionString;
+        //        DateTime? startDate = ParseDate("08-03-2026 00:00:00.00");  //DateTime.UtcNow;   // null; // Convert.ToDateTime(ConfigurationManager.AppSettings["StartDate"]);
+        //        DateTime? endDate = ParseDate("08-03-2026 00:00:00.00");  //DateTime.UtcNow;   // null; // Convert.ToDateTime(ConfigurationManager.AppSettings["StartDate"]);
+        //                                                                  //DateTime? endDate = DateTime.UtcNow;   // null; // Convert.ToDateTime(ConfigurationManager.AppSettings["StartDate"]);
+        //                                                                  //DateTime? start = ParseDate(startDate);
+        //                                                                  //DateTime? end = ParseDate(endDate);
+        //        using (IDbConnection _dapperDbConnection = new SqlConnection(_connection))
+        //        {
+        //            var parameters = new DynamicParameters();
+        //            parameters.Add("@Session_UserId", sessionUserId, DbType.Decimal);
+        //            parameters.Add("@Business_GroupId", businessGroupId, DbType.Decimal);
+        //            parameters.Add("@StartDate", startDate, DbType.DateTime);
+        //            parameters.Add("@EndDate", endDate, DbType.DateTime);
+        //            var result = await _dapperDbConnection.QueryAsync<UserLocationExportModel>("SP_GET_USER_LOCATION", parameters, commandType: CommandType.StoredProcedure);
+        //            return result.ToList();
+        //        }
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        Console.WriteLine($"Error fetching user location data: {ex.Message}");
+        //        return new List<UserLocationExportModel>();
+        //    }
+           
+        //}
+
+
+
+        public static async Task<AddressModel> GetStructuredAddressAsync(double? lat, double? lng)
+        {
+            if (lat == null || lng == null)
+                throw new ArgumentNullException("Coordinates must not be null.");
+
+            string url = $"https://nominatim.openstreetmap.org/reverse?lat={lat}&lon={lng}&format=json";
+
+            var request = new HttpRequestMessage(HttpMethod.Get, url);
+
+            request.Headers.TryAddWithoutValidation("User-Agent", "GeoLocationApp/1.0 (outsource1@powersoft.in)");
+            request.Headers.TryAddWithoutValidation("Referer", "https://myapp.com");
+            request.Headers.TryAddWithoutValidation("Accept", "application/json");
+            request.Headers.TryAddWithoutValidation("Accept-Language", "en");
+
+            await Task.Delay(2000);
+
+            HttpResponseMessage response = await _httpClient.SendAsync(request);
+
+            if ((int)response.StatusCode == 429)
+            {
+                await Task.Delay(2000);
+                response = await _httpClient.SendAsync(request);
+            }
+
+            if (response.StatusCode == System.Net.HttpStatusCode.Forbidden)
+                throw new Exception("403 Forbidden — Nominatim blocked the request.");
+
+            string json = await response.Content.ReadAsStringAsync();
+
+            using (JsonDocument doc = JsonDocument.Parse(json))
+            {
+                var root = doc.RootElement;
+
+                if (root.TryGetProperty("error", out var error))
+                    throw new Exception($"Nominatim error: {error.GetString()}");
+
+                var addressProp = root.GetProperty("address");
+
+                return new AddressModel
+                {
+                    FullAddress = root.TryGetProperty("display_name", out var dn) ? dn.GetString() ?? "" : "",
+                    Road = GetAddressField(addressProp, "road", "pedestrian", "footway"),
+                    City = GetAddressField(addressProp, "city", "town", "village", "suburb", "county"),
+                    State = GetAddressField(addressProp, "state"),
+                    Country = GetAddressField(addressProp, "country"),
+                    PostCode = GetAddressField(addressProp, "postcode")
+                };
+            }
+        }
+
+        private static string GetAddressField(JsonElement addressProp, params string[] keys)
+        {
+            foreach (var key in keys)
+            {
+                if (addressProp.TryGetProperty(key, out var val))
+                {
+                    var str = val.GetString();
+                    if (!string.IsNullOrEmpty(str))
+                        return str;
+                }
+            }
+            return "";
+        }
+
+
         public static async Task<List<UserLocationExportModel>> GetUserLocationList(decimal? sessionUserId, decimal? businessGroupId)
         {
+            string connectionString = ConfigurationManager.ConnectionStrings["defaultConnection"].ConnectionString;
+
+            using (var connection = new SqlConnection(connectionString))
+            {
+                await connection.OpenAsync();
+
+                var parameters = new DynamicParameters();
+                parameters.Add("@Session_UserId", sessionUserId, DbType.Decimal);
+                parameters.Add("@Business_GroupId", businessGroupId, DbType.Decimal);
+
+                var result = await connection.QueryAsync<UserLocationExportModel>(
+                    "SP_GET_USER_LOCATION",
+                    parameters,   // 🔥 FIXED (you missed this)
+                    commandType: CommandType.StoredProcedure
+                );
+
+                return result.ToList();
+            }
+        }
+
+        public static async Task<string> InsertUpdateUserLocation(UserLocation_Model model)
+        {
+            string connectionString = ConfigurationManager.ConnectionStrings["defaultConnection"].ConnectionString;
+
+            using (var connection = new SqlConnection(connectionString))
+            {
+                try
+                {
+                    await connection.OpenAsync();
+
+                    var parameters = new DynamicParameters();
+                    parameters.Add("@Tran_ID", model.Tran_ID, DbType.Decimal);
+                    parameters.Add("@Mongo_ID", model.Mongo_ID, DbType.String);
+                    parameters.Add("@User_id", model.User_id, DbType.Decimal);
+                    parameters.Add("@Selected_location", model.Selected_location, DbType.String);
+                    parameters.Add("@Purpose", model.Purpose, DbType.String);
+                    parameters.Add("@CheckIn_time", model.CheckIn_time, DbType.DateTime);
+                    parameters.Add("@CheckOut_time", model.CheckOut_time, DbType.DateTime);
+                    parameters.Add("@Flag", model.Flag, DbType.String);
+                    parameters.Add("@Latitude", model.Latitude, DbType.Double);
+                    parameters.Add("@Longtude", model.Longtude, DbType.Double);
+                    parameters.Add("@checkout_location", model.checkout_location, DbType.String);
+                    parameters.Add("@checkOut_latitude", model.checkOut_latitude, DbType.Double);
+                    parameters.Add("@checkOut_longitude", model.checkOut_longitude, DbType.Double);
+                    parameters.Add("@Emp_Card_No", model.Emp_Card_No, DbType.Decimal);
+                    parameters.Add("@Tran_Datetime", model.Tran_Datetime, DbType.DateTime);
+                    parameters.Add("@CILocation", model.CILocation, DbType.String);
+                    parameters.Add("@CoLocation", model.CoLocation, DbType.String);
+
+                    parameters.Add("@Session_UserId", model.Session_UserId, DbType.Decimal);
+                    parameters.Add("@Business_GroupId", model.Business_GroupId, DbType.Decimal);
+
+                    // ✅ OUTPUT PARAM
+                    parameters.Add("@ResponseMessage", dbType: DbType.String, size: 500, direction: ParameterDirection.Output);
+
+                    await connection.ExecuteAsync(
+                        "sp_InsertUpdate_UserLocation",
+                        parameters,
+                        commandType: CommandType.StoredProcedure
+                    );
+
+                    return parameters.Get<string>("@ResponseMessage");
+                }
+                catch (Exception ex)
+                {
+                    return ex.Message;
+                }
+            }
+        }
+
+        public static async Task<ResponseObject> GetUserLocation(decimal? sessionUserId,decimal? businessGroupId,string startDate,string endDate)
+        {
+            var response = new ResponseObject();
+
             try
             {
-                var _connection = ConfigurationManager.ConnectionStrings["defaultConnection"].ConnectionString;
-                DateTime? startDate = ParseDate("08-03-2026 00:00:00.00");  //DateTime.UtcNow;   // null; // Convert.ToDateTime(ConfigurationManager.AppSettings["StartDate"]);
-                DateTime? endDate = ParseDate("08-03-2026 00:00:00.00");  //DateTime.UtcNow;   // null; // Convert.ToDateTime(ConfigurationManager.AppSettings["StartDate"]);
-                                                                          //DateTime? endDate = DateTime.UtcNow;   // null; // Convert.ToDateTime(ConfigurationManager.AppSettings["StartDate"]);
-                                                                          //DateTime? start = ParseDate(startDate);
-                                                                          //DateTime? end = ParseDate(endDate);
-                using (IDbConnection _dapperDbConnection = new SqlConnection(_connection))
+                string connectionString = ConfigurationManager.ConnectionStrings["defaultConnection"].ConnectionString;
+
+                DateTime? start = ParseDate(startDate);
+                DateTime? end = ParseDate(endDate);
+
+                using (var connection = new SqlConnection(connectionString))
                 {
+                    await connection.OpenAsync();
+
                     var parameters = new DynamicParameters();
                     parameters.Add("@Session_UserId", sessionUserId, DbType.Decimal);
                     parameters.Add("@Business_GroupId", businessGroupId, DbType.Decimal);
-                    parameters.Add("@StartDate", startDate, DbType.DateTime);
-                    parameters.Add("@EndDate", endDate, DbType.DateTime);
-                    var result = await _dapperDbConnection.QueryAsync<UserLocationExportModel>("SP_GET_USER_LOCATION", parameters, commandType: CommandType.StoredProcedure);
-                    return result.ToList();
+                    parameters.Add("@StartDate", start);
+                    parameters.Add("@EndDate", end);
+
+                    var result = (await connection.QueryAsync<UserLocation_Model>(
+                        "SP_GET_USER_LOCATION",
+                        parameters,
+                        commandType: CommandType.StoredProcedure
+                    )).ToList();
+
+                    if (result == null || !result.Any())
+                    {
+                        response.Status = "Error";
+                        response.Message = "No Data Found";
+                        return response;
+                    }
+
+                    var processedList = new List<UserLocation_Model>();
+
+                    foreach (var item in result)
+                    {
+                        try
+                        {
+                            bool isValidCheckoutLocation =
+                                item.checkOut_latitude.HasValue &&
+                                item.checkOut_longitude.HasValue &&
+                                item.checkOut_latitude != 0 &&
+                                item.checkOut_longitude != 0;
+
+                            string checkoutAddress = item.checkout_location;
+
+                            if (isValidCheckoutLocation)
+                            {
+                                var address = await GetStructuredAddressAsync(
+                                    item.checkOut_latitude,
+                                    item.checkOut_longitude);
+
+                                checkoutAddress = address.FullAddress;
+                            }
+
+                            var model = new UserLocation_Model
+                            {
+                                Tran_ID = item.Tran_ID,
+                                Mongo_ID = item.Mongo_ID,
+                                User_id = item.User_id,
+                                Selected_location = item.Selected_location,
+                                Purpose = item.Purpose,
+                                CheckIn_time = item.CheckIn_time,
+                                CheckOut_time = item.CheckOut_time,
+                                Flag = item.Flag,
+                                Latitude = item.Latitude,
+                                Longtude = item.Longtude,
+                                checkout_location = checkoutAddress,
+                                checkOut_latitude = item.checkOut_latitude,
+                                checkOut_longitude = item.checkOut_longitude,
+                                Emp_Card_No = item.Emp_Card_No,
+                                Tran_Datetime = item.Tran_Datetime,
+                                CILocation = item.Selected_location,
+                                CoLocation = checkoutAddress
+                            };
+
+                            // 🔥 Save back to DB
+                            var dbResponse = await InsertUpdateUserLocation(model);
+
+                            if (!dbResponse.Contains("SUCCESS") && !dbResponse.Contains("Updated"))
+                            {
+                                response.Status = "Error";
+                                response.Message = $"Insert Failed for Tran_ID: {item.Tran_ID}";
+                                response.Data = item;
+                                return response;
+                            }
+
+                            processedList.Add(model);
+                        }
+                        catch (Exception ex)
+                        {
+                            response.Status = "Error";
+                            response.Message = ex.Message;
+                            return response;
+                        }
+                    }
+
+                    response.Status = "SUCCESS";
+                    response.Message = "All Data Processed Successfully";
+                    response.Data = processedList;
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error fetching user location data: {ex.Message}");
-                return new List<UserLocationExportModel>();
+                response.Status = "Error";
+                response.Message = ex.Message;
             }
-           
+
+            return response;
         }
+
+
 
         #endregion
 
